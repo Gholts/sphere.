@@ -33,12 +33,6 @@ struct ProxiesView: View {
                             ProxyGroupSection(group: group, proxyColumns: proxyColumns)
                         }
                     }
-                    
-                    Section("All Proxies") {
-                        ForEach(app.proxyCollection.proxies) { proxy in
-                            ProxyRow(proxy: proxy)
-                        }
-                    }
                 }
             }
             .backendPageToolbar(tab: .proxies)
@@ -161,42 +155,6 @@ struct ProxyChoiceButton: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(proxy?.name ?? name)\(isSelected ? ", selected" : "")")
-    }
-}
-
-struct ProxyRow: View {
-    var proxy: ProxyItem
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                ProxyIconView(icon: proxy.icon, size: 16)
-                Text(proxy.name)
-                Spacer()
-                Text(proxy.type)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            HStack(spacing: 12) {
-                if let delay = proxy.delay {
-                    HStack(spacing: 6) {
-                        Image(systemName: "gauge.with.needle.fill")
-                        Text("\(delay) ms")
-                    }
-                }
-
-                if let now = proxy.now {
-                    HStack(spacing: 6) {
-                        Image(systemName: "arrowshape.turn.up.right.fill")
-                        Text(now)
-                    }
-                }
-            }
-            .font(.caption)
-            .foregroundStyle(.secondary)
-
-            ProxyMetaLine(proxy: proxy)
-        }
     }
 }
 

@@ -27,16 +27,16 @@ struct MoreView: View {
                     }
                 }
 
-                Section("Mode") {
-                    Picker("Mode", selection: modeBinding) {
+                Section("Overview") {
+                    Picker(selection: modeBinding) {
                         ForEach(ClashMode.allCases) { mode in
                             Text(mode.rawValue).tag(mode)
                         }
+                    } label: {
+                        Text("Mode")
+                            .foregroundStyle(.secondary)
                     }
-                    .pickerStyle(.segmented)
-                }
 
-                Section("Overview") {
                     OverviewRows(overview: live.overview)
                 }
 
