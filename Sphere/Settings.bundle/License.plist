@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>PreferenceSpecifiers</key>
+	<array>
+		<dict>
+			<key>Type</key>
+			<string>PSGroupSpecifier</string>
+			<key>Title</key>
+			<string>Application Icon Illustration</string>
+			<key>FooterText</key>
+			<string>App icon illustrations include assets licensed under Creative Commons Attribution 4.0 International (CC BY 4.0). You are free to share and adapt the material with appropriate attribution. Source and author information should be retained with the project records.</string>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSTitleValueSpecifier</string>
+			<key>Title</key>
+			<string>License</string>
+			<key>Key</key>
+			<string>sphere.settings.iconLicense</string>
+			<key>DefaultValue</key>
+			<string>CC BY 4.0</string>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSTitleValueSpecifier</string>
+			<key>Title</key>
+			<string>Attribution</string>
+			<key>Key</key>
+			<string>sphere.settings.iconAttribution</string>
+			<key>DefaultValue</key>
+			<string>Icon illustration by Figma Community author @brixtemplates</string>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSGroupSpecifier</string>
+			<key>Title</key>
+			<string>Zashboard Reference</string>
+			<key>FooterText</key>
+			<string>This app references the Zashboard project, which is licensed under the MIT License. Copyright and license notices are retained as required by the MIT License.</string>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSTitleValueSpecifier</string>
+			<key>Title</key>
+			<string>License</string>
+			<key>Key</key>
+			<string>sphere.settings.zashboardLicense</string>
+			<key>DefaultValue</key>
+			<string>MIT License</string>
+		</dict>
+		<dict>
+			<key>Type</key>
+			<string>PSTitleValueSpecifier</string>
+			<key>Title</key>
+			<string>Project</string>
+			<key>Key</key>
+			<string>sphere.settings.zashboardProject</string>
+			<key>DefaultValue</key>
+			<string>Zashboard</string>
+		</dict>
+	</array>
+	<key>StringsTable</key>
+	<string>Licenses</string>
+	<key>Title</key>
+	<string>Licenses</string>
+</dict>
+</plist>
