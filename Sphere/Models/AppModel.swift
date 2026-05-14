@@ -104,6 +104,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var isBackendErrorDebouncing = false
     @Published private(set) var isManualRefreshActive = false
     @Published private(set) var toolbarRefreshingTabs: Set<AppTab> = []
+    @Published private(set) var isTestingProxyGroupDelays = false
     @Published private(set) var proxyGroupExpansionRevision = 0
 
     let liveStore = LiveBackendStore()
@@ -406,6 +407,35 @@ final class AppModel: ObservableObject {
             try await client.refreshProxyProvider(name)
             proxyProviders = try await client.proxyProviders()
             saveCachedDataIfUseful()
+        }
+    }
+
+    func testProxyGroupDelays() async {
+        guard let client, !isTestingProxyGroupDelays else { return }
+        let groupNames = proxyCollection.groups.map(\.name)
+        guard !groupNames.isEmpty else { return }
+
+        isTestingProxyGroupDelays = true
+        defer { isTestingProxyGroupDelays = false }
+
+        _ = await captureErrors {
+            var didChange = false
+            let delays = try await delayProxyGroups(client: client, groupNames: groupNames)
+            if !delays.isEmpty {
+                didChange = setProxyCollection(proxyCollection.applyingDelayResults(delays)) || didChange
+            }
+            let proxyRefresh = await result { try await client.proxies() }
+            switch proxyRefresh {
+            case .success(let collection):
+                didChange = setProxyCollection(collection) || didChange
+            case .failure(let error):
+                if delays.isEmpty {
+                    throw error
+                }
+            }
+            if didChange {
+                saveCachedDataIfUseful()
+            }
         }
     }
 
@@ -745,6 +775,55 @@ final class AppModel: ObservableObject {
             beginBackendErrorDebounce(error.localizedDescription)
             return outcome
         }
+    }
+
+    private func delayProxyGroups(client: any ProxyBackendClient, groupNames: [String]) async throws -> [String: Int] {
+        var mergedDelays: [String: Int] = [:]
+        var firstError: Error?
+        var successCount = 0
+        var startIndex = groupNames.startIndex
+
+        while startIndex < groupNames.endIndex {
+            let endIndex = groupNames.index(startIndex, offsetBy: ProxyLatencyTestDefaults.maxConcurrentGroups, limitedBy: groupNames.endIndex) ?? groupNames.endIndex
+            let batch = Array(groupNames[startIndex..<endIndex])
+            let results = await withTaskGroup(of: Result<[String: Int], Error>.self) { taskGroup in
+                for groupName in batch {
+                    taskGroup.addTask {
+                        do {
+                            return .success(try await client.delayProxyGroup(
+                                groupName,
+                                url: ProxyLatencyTestDefaults.url,
+                                timeout: ProxyLatencyTestDefaults.timeout
+                            ))
+                        } catch {
+                            return .failure(error)
+                        }
+                    }
+                }
+
+                var values: [Result<[String: Int], Error>] = []
+                for await result in taskGroup {
+                    values.append(result)
+                }
+                return values
+            }
+
+            for result in results {
+                switch result {
+                case .success(let delays):
+                    successCount += 1
+                    mergedDelays.merge(delays) { _, next in next }
+                case .failure(let error):
+                    firstError = firstError ?? error
+                }
+            }
+            startIndex = endIndex
+        }
+
+        if successCount == 0, let firstError {
+            throw firstError
+        }
+        return mergedDelays
     }
 
     private func prepareRefresh(source: RefreshSource) {

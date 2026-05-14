@@ -14,6 +14,7 @@ protocol ProxyBackendClient: Sendable {
     func proxies() async throws -> ProxyCollection
     func selectProxy(group: String, proxy: String) async throws
     func delayProxy(_ proxy: String, url: String, timeout: Int) async throws -> Int?
+    func delayProxyGroup(_ group: String, url: String, timeout: Int) async throws -> [String: Int]
     func proxyProviders() async throws -> [ProxyProvider]
     func refreshProxyProvider(_ name: String) async throws
     func rules() async throws -> [RuleItem]
@@ -54,6 +55,7 @@ struct UnsupportedBackendClient: ProxyBackendClient {
     func proxies() async throws -> ProxyCollection { throw BackendError.unsupportedBackend(profile.kind.title) }
     func selectProxy(group: String, proxy: String) async throws { throw BackendError.unsupportedBackend(profile.kind.title) }
     func delayProxy(_ proxy: String, url: String, timeout: Int) async throws -> Int? { throw BackendError.unsupportedBackend(profile.kind.title) }
+    func delayProxyGroup(_ group: String, url: String, timeout: Int) async throws -> [String: Int] { throw BackendError.unsupportedBackend(profile.kind.title) }
     func proxyProviders() async throws -> [ProxyProvider] { throw BackendError.unsupportedBackend(profile.kind.title) }
     func refreshProxyProvider(_ name: String) async throws { throw BackendError.unsupportedBackend(profile.kind.title) }
     func rules() async throws -> [RuleItem] { throw BackendError.unsupportedBackend(profile.kind.title) }
@@ -75,6 +77,12 @@ struct UnsupportedBackendClient: ProxyBackendClient {
     func trafficEvents() -> AsyncThrowingStream<TrafficSnapshot, Error> {
         AsyncThrowingStream { continuation in continuation.finish(throwing: BackendError.unsupportedBackend(profile.kind.title)) }
     }
+}
+
+enum ProxyLatencyTestDefaults {
+    nonisolated static let url = "https://www.gstatic.com/generate_204"
+    nonisolated static let timeout = 5000
+    nonisolated static let maxConcurrentGroups = 3
 }
 
 enum BackendError: LocalizedError, Equatable {
@@ -109,7 +117,7 @@ struct URLRequestFactory {
         guard var components = URLComponents(string: URLNormalizer.normalizedBaseURL(profile.baseURL)) else {
             throw BackendError.invalidBaseURL
         }
-        components.path = components.path + path
+        components.percentEncodedPath = components.percentEncodedPath + path
         if !query.isEmpty {
             components.queryItems = query
         }

@@ -33,30 +33,23 @@ struct ProxiesView: View {
                             ProxyGroupSection(group: group, proxyColumns: proxyColumns)
                         }
                     } header: {
-                        HStack(alignment: .firstTextBaseline) {
+                        HStack(alignment: .center) {
                             Text("Groups")
                             Spacer()
-                            Button {
-                                withAnimation(.smooth(duration: 0.28)) {
-                                    app.setAllProxyGroupsExpanded(!allProxyGroupsExpanded, groups: app.proxyCollection.groups)
+                            HStack(spacing: 8) {
+                                ProxyGroupExpansionButton(
+                                    title: expansionActionTitle,
+                                    symbol: expansionActionSymbol
+                                ) {
+                                    withAnimation(.smooth(duration: 0.28)) {
+                                        app.setAllProxyGroupsExpanded(!allProxyGroupsExpanded, groups: app.proxyCollection.groups)
+                                    }
                                 }
-                            } label: {
-                                HStack(spacing: 4) {
-                                    Text(expansionActionTitle)
-                                        .frame(width: 64, alignment: .trailing)
-                                    Image(systemName: expansionActionSymbol)
-                                        .frame(width: 12, alignment: .trailing)
-                                }
-                                .frame(width: 82, alignment: .trailing)
-                                .font(.caption2)
-                                .contentShape(.rect)
-                                .transaction { transaction in
-                                    transaction.animation = nil
+                                ProxyGroupSpeedTestButton(isTesting: app.isTestingProxyGroupDelays) {
+                                    Task { await app.testProxyGroupDelays() }
                                 }
                             }
-                            .buttonStyle(.plain)
-                            .foregroundStyle(.secondary)
-                            .accessibilityLabel(expansionActionTitle)
+                            .frame(height: 18, alignment: .center)
                         }
                     }
                 }
@@ -78,6 +71,61 @@ struct ProxiesView: View {
 
     private var expansionActionSymbol: String {
         allProxyGroupsExpanded ? "chevron.up" : "chevron.down"
+    }
+}
+
+struct ProxyGroupExpansionButton: View {
+    var title: String
+    var symbol: String
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Text(title)
+                    .frame(width: 64, alignment: .trailing)
+                Image(systemName: symbol)
+                    .frame(width: 12, alignment: .trailing)
+            }
+            .frame(width: 82, alignment: .trailing)
+            .frame(height: 18, alignment: .center)
+            .font(.caption2)
+            .contentShape(.rect)
+            .transaction { transaction in
+                transaction.animation = nil
+            }
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.secondary)
+        .accessibilityLabel(title)
+    }
+}
+
+struct ProxyGroupSpeedTestButton: View {
+    var isTesting: Bool
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            ZStack {
+                Image(systemName: "speedometer")
+                    .opacity(isTesting ? 0 : 1)
+                if isTesting {
+                    ProgressView()
+                        .controlSize(.mini)
+                        .tint(Color.secondary)
+                        .transition(.spinnerBadgeAppearance)
+                }
+            }
+            .frame(width: 18, height: 18)
+            .font(.caption2)
+            .contentShape(.rect)
+            .animation(.spinnerBadgeAppearance, value: isTesting)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.secondary)
+        .disabled(isTesting)
+        .accessibilityLabel(isTesting ? "Testing node speed" : "Test node speed")
     }
 }
 
@@ -181,14 +229,19 @@ struct ProxyChoiceButton: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                     Spacer()
-                    if isSelected {
-                        Image(systemName: "checkmark.circle.fill")
-                            .imageScale(.small)
-                    }
+                    Image(systemName: "checkmark.circle.fill")
+                        .imageScale(.small)
+                        .opacity(isSelected ? 1 : 0)
+                        .frame(width: 14)
+                        .accessibilityHidden(!isSelected)
                 }
 
                 if let proxy {
-                    ProxyMetaLine(proxy: proxy)
+                    HStack(spacing: 6) {
+                        ProxyMetaLine(proxy: proxy)
+                        Spacer(minLength: 0)
+                        ProxyDelayBadge(delay: proxy.delay)
+                    }
                 }
             }
             .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading)
@@ -198,6 +251,33 @@ struct ProxyChoiceButton: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(proxy?.name ?? name)\(isSelected ? ", selected" : "")")
+    }
+}
+
+struct ProxyDelayBadge: View {
+    var delay: Int?
+
+    var body: some View {
+        Group {
+            if let delay {
+                Text(label(for: delay))
+                    .font(.caption2.monospacedDigit())
+                    .lineLimit(1)
+                    .foregroundStyle(delay > 0 ? Color.secondary : Color.orange)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 2)
+                    .background(Color.secondary.opacity(0.08), in: Capsule())
+                    .accessibilityLabel(delay > 0 ? "\(delay) milliseconds" : "Latency timeout")
+            } else {
+                Color.clear
+                    .accessibilityHidden(true)
+            }
+        }
+        .frame(width: 50, height: 18, alignment: .trailing)
+    }
+
+    private func label(for delay: Int) -> String {
+        delay > 0 ? "\(delay) ms" : "Timeout"
     }
 }
 

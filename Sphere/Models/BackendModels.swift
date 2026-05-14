@@ -232,6 +232,14 @@ struct ProxyCollection: Codable, Equatable, Sendable {
         proxies.first { $0.name == name } ?? groups.first { $0.name == name }
     }
 
+    func applyingDelayResults(_ delays: [String: Int]) -> ProxyCollection {
+        guard !delays.isEmpty else { return self }
+        return ProxyCollection(
+            proxies: proxies.map { $0.applyingDelayResult(delays[$0.name]) },
+            groups: groups.map { $0.applyingDelayResult(delays[$0.name]) }
+        )
+    }
+
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         if let cachedGroups = try container.decodeIfPresent([ProxyItem].self, forKey: .groups) {
@@ -271,6 +279,15 @@ struct ProxyCollection: Codable, Equatable, Sendable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(proxies, forKey: .proxies)
         try container.encode(groups, forKey: .groups)
+    }
+}
+
+private extension ProxyItem {
+    func applyingDelayResult(_ delay: Int?) -> ProxyItem {
+        guard let delay else { return self }
+        var copy = self
+        copy.delay = delay
+        return copy
     }
 }
 

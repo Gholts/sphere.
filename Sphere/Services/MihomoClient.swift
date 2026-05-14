@@ -78,7 +78,7 @@ struct MihomoClient: ProxyBackendClient {
         try await requestNoBody(path: "/proxies/\(escaped(group))", method: "PUT", body: body)
     }
 
-    func delayProxy(_ proxy: String, url: String = "https://www.gstatic.com/generate_204", timeout: Int = 5000) async throws -> Int? {
+    func delayProxy(_ proxy: String, url: String = ProxyLatencyTestDefaults.url, timeout: Int = ProxyLatencyTestDefaults.timeout) async throws -> Int? {
         try await request(
             path: "/proxies/\(escaped(proxy))/delay",
             query: [
@@ -87,6 +87,17 @@ struct MihomoClient: ProxyBackendClient {
             ],
             response: ProxyDelayPayload.self
         ).delay
+    }
+
+    func delayProxyGroup(_ group: String, url: String = ProxyLatencyTestDefaults.url, timeout: Int = ProxyLatencyTestDefaults.timeout) async throws -> [String: Int] {
+        try await request(
+            path: "/group/\(escaped(group))/delay",
+            query: [
+                URLQueryItem(name: "url", value: url),
+                URLQueryItem(name: "timeout", value: String(timeout))
+            ],
+            response: [String: Int].self
+        )
     }
 
     func proxyProviders() async throws -> [ProxyProvider] {
@@ -229,7 +240,9 @@ struct MihomoClient: ProxyBackendClient {
     }
 
     private func escaped(_ value: String) -> String {
-        value.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? value
+        var allowed = CharacterSet.urlPathAllowed
+        allowed.remove(charactersIn: ":#[]@!$&'()*+,;=/%?")
+        return value.addingPercentEncoding(withAllowedCharacters: allowed) ?? value
     }
 
 }
