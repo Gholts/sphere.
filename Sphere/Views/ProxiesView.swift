@@ -28,9 +28,35 @@ struct ProxiesView: View {
                         }
                     }
                     
-                    Section("Groups") {
+                    Section {
                         ForEach(app.proxyCollection.groups) { group in
                             ProxyGroupSection(group: group, proxyColumns: proxyColumns)
+                        }
+                    } header: {
+                        HStack(alignment: .firstTextBaseline) {
+                            Text("Groups")
+                            Spacer()
+                            Button {
+                                withAnimation(.smooth(duration: 0.28)) {
+                                    app.setAllProxyGroupsExpanded(!allProxyGroupsExpanded, groups: app.proxyCollection.groups)
+                                }
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Text(expansionActionTitle)
+                                        .frame(width: 64, alignment: .trailing)
+                                    Image(systemName: expansionActionSymbol)
+                                        .frame(width: 12, alignment: .trailing)
+                                }
+                                .frame(width: 82, alignment: .trailing)
+                                .font(.caption2)
+                                .contentShape(.rect)
+                                .transaction { transaction in
+                                    transaction.animation = nil
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(.secondary)
+                            .accessibilityLabel(expansionActionTitle)
                         }
                     }
                 }
@@ -40,6 +66,18 @@ struct ProxiesView: View {
                 await app.refreshProxies(source: .pullToRefresh)
             }
         }
+    }
+
+    private var allProxyGroupsExpanded: Bool {
+        app.areAllProxyGroupsExpanded(app.proxyCollection.groups)
+    }
+
+    private var expansionActionTitle: String {
+        allProxyGroupsExpanded ? "Collapse All" : "Expand All"
+    }
+
+    private var expansionActionSymbol: String {
+        allProxyGroupsExpanded ? "chevron.up" : "chevron.down"
     }
 }
 
@@ -84,6 +122,11 @@ struct ProxyGroupSection: View {
             }
             .onChange(of: group.name) {
                 isExpanded = app.isProxyGroupExpanded(group.name)
+            }
+            .onChange(of: app.proxyGroupExpansionRevision) {
+                withAnimation(.smooth(duration: 0.28)) {
+                    isExpanded = app.isProxyGroupExpanded(group.name)
+                }
             }
             .onChange(of: isExpanded) {
                 app.setProxyGroupExpanded(isExpanded, groupName: group.name)

@@ -3,7 +3,7 @@ import SwiftUI
 struct MoreView: View {
     @EnvironmentObject private var app: AppModel
     @EnvironmentObject private var live: LiveBackendStore
-    @State private var showAddProfile = false
+    @State private var profileForm: ProfileFormPresentation?
 
     var body: some View {
         NavigationStack {
@@ -16,7 +16,7 @@ struct MoreView: View {
                     }
 
                     Button {
-                        showAddProfile = true
+                        profileForm = .add
                     } label: {
                         Label("Add Profile", systemImage: "plus.circle")
                     }
@@ -24,6 +24,12 @@ struct MoreView: View {
                     if let profile = app.selectedProfile {
                         StatRow(title: "Type", value: profile.kind.title)
                         StatRow(title: "URL", value: profile.baseURL)
+
+                        Button {
+                            profileForm = .edit(profile)
+                        } label: {
+                            Label("Edit Profile", systemImage: "pencil")
+                        }
                     }
                 }
 
@@ -69,19 +75,30 @@ struct MoreView: View {
 
                 Section("Profiles") {
                     ForEach(app.profiles) { profile in
-                        VStack(alignment: .leading) {
-                            Text(profile.name)
-                            Text("\(profile.kind.title) · \(profile.baseURL)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                        Button {
+                            profileForm = .edit(profile)
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading) {
+                                    Text(profile.name)
+                                    Text("\(profile.kind.title) · \(profile.baseURL)")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundStyle(.tertiary)
+                            }
                         }
+                        .foregroundStyle(.primary)
                     }
                     .onDelete(perform: app.deleteProfiles)
                 }
             }
             .backendPageToolbar(tab: .more)
-            .sheet(isPresented: $showAddProfile) {
-                ProfileWizardView(canDismiss: true)
+            .sheet(item: $profileForm) { form in
+                ProfileWizardView(editingProfile: form.editingProfile, canDismiss: true)
                     .environmentObject(app)
             }
             .refreshable {
@@ -106,6 +123,29 @@ struct MoreView: View {
 
     private var canUpdateCore: Bool {
         app.selectedProfile?.kind == .mihomo && !live.overview.version.localizedCaseInsensitiveContains("sing-box")
+    }
+}
+
+private enum ProfileFormPresentation: Identifiable {
+    case add
+    case edit(APIProfile)
+
+    var id: String {
+        switch self {
+        case .add:
+            return "add"
+        case .edit(let profile):
+            return profile.id.uuidString
+        }
+    }
+
+    var editingProfile: APIProfile? {
+        switch self {
+        case .add:
+            return nil
+        case .edit(let profile):
+            return profile
+        }
     }
 }
 

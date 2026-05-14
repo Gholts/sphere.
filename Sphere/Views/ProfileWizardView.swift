@@ -3,14 +3,26 @@ import SwiftUI
 struct ProfileWizardView: View {
     @EnvironmentObject private var app: AppModel
     @Environment(\.dismiss) private var dismiss
-    @State private var name = "Mihomo"
-    @State private var kind: BackendKind = .mihomo
-    @State private var baseURL = "http://127.0.0.1:9090"
-    @State private var secret = ""
+    @State private var name: String
+    @State private var kind: BackendKind
+    @State private var baseURL: String
+    @State private var secret: String
     @State private var testResult: ProfileTestResult?
     @State private var isTesting = false
     private let minimumTestingIndicatorDuration: TimeInterval = 0.35
-    var canDismiss = false
+    private let editingProfile: APIProfile?
+    private let profileID: UUID
+    var canDismiss: Bool
+
+    init(editingProfile: APIProfile? = nil, canDismiss: Bool = false) {
+        self.editingProfile = editingProfile
+        self.profileID = editingProfile?.id ?? UUID()
+        self.canDismiss = canDismiss
+        _name = State(initialValue: editingProfile?.name ?? "")
+        _kind = State(initialValue: editingProfile?.kind ?? .mihomo)
+        _baseURL = State(initialValue: editingProfile?.baseURL ?? "http://127.0.0.1:9090")
+        _secret = State(initialValue: editingProfile?.secret ?? "")
+    }
 
     var body: some View {
         NavigationStack {
@@ -59,7 +71,7 @@ struct ProfileWizardView: View {
                     Button {
                         saveProfile()
                     } label: {
-                        Label("Save Profile", systemImage: "checkmark.circle")
+                        Label(saveButtonTitle, systemImage: "checkmark.circle")
                     }
                     .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || baseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
@@ -73,7 +85,7 @@ struct ProfileWizardView: View {
                     }
                 }
             }
-            .navigationTitle("Add Backend")
+            .navigationTitle(navigationTitle)
             .navigationBarTitleDisplayMode(canDismiss ? .inline : .automatic)
             .toolbar {
                 if canDismiss {
@@ -88,7 +100,15 @@ struct ProfileWizardView: View {
     }
 
     private var profile: APIProfile {
-        APIProfile(name: name, kind: kind, baseURL: baseURL, secret: secret)
+        APIProfile(id: profileID, name: name, kind: kind, baseURL: baseURL, secret: secret)
+    }
+
+    private var navigationTitle: String {
+        editingProfile == nil ? "Add Backend" : "Edit Backend"
+    }
+
+    private var saveButtonTitle: String {
+        editingProfile == nil ? "Save Profile" : "Save Changes"
     }
 
     private func test() async {
@@ -114,7 +134,11 @@ struct ProfileWizardView: View {
     }
 
     private func saveProfile() {
-        app.addProfile(profile)
+        if editingProfile == nil {
+            app.addProfile(profile)
+        } else {
+            app.updateProfile(profile)
+        }
         if canDismiss {
             dismiss()
         }

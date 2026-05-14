@@ -104,6 +104,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var isBackendErrorDebouncing = false
     @Published private(set) var isManualRefreshActive = false
     @Published private(set) var toolbarRefreshingTabs: Set<AppTab> = []
+    @Published private(set) var proxyGroupExpansionRevision = 0
 
     let liveStore = LiveBackendStore()
     let logStore = LogStore()
@@ -219,6 +220,26 @@ final class AppModel: ObservableObject {
         selectedProfileID = profile.id
         saveProfiles()
         selectedTab = .proxies
+    }
+
+    func updateProfile(_ profile: APIProfile) {
+        guard let index = profiles.firstIndex(where: { $0.id == profile.id }) else {
+            addProfile(profile)
+            return
+        }
+        let oldProfile = profiles[index]
+        let wasSelected = selectedProfile?.id == profile.id
+        profiles[index] = profile
+        if wasSelected {
+            selectedProfileID = profile.id
+        }
+        saveProfiles()
+
+        guard wasSelected else { return }
+        if oldProfile.kind != profile.kind || oldProfile.baseURL != profile.baseURL {
+            defaults.removeObject(forKey: cacheKey(profileID: profile.id))
+            resetLoadedData()
+        }
     }
 
     func deleteProfiles(at offsets: IndexSet) {
@@ -496,8 +517,25 @@ final class AppModel: ObservableObject {
         return stored
     }
 
+    func areAllProxyGroupsExpanded(_ groups: [ProxyItem]) -> Bool {
+        !groups.isEmpty && groups.allSatisfy { isProxyGroupExpanded($0.name) }
+    }
+
     func setProxyGroupExpanded(_ isExpanded: Bool, groupName: String) {
-        defaults.set(isExpanded, forKey: proxyGroupExpandedKey(groupName))
+        let key = proxyGroupExpandedKey(groupName)
+        if let stored = defaults.object(forKey: key) as? Bool, stored == isExpanded {
+            return
+        }
+        defaults.set(isExpanded, forKey: key)
+        proxyGroupExpansionRevision &+= 1
+    }
+
+    func setAllProxyGroupsExpanded(_ isExpanded: Bool, groups: [ProxyItem]) {
+        guard !groups.isEmpty else { return }
+        for group in groups {
+            defaults.set(isExpanded, forKey: proxyGroupExpandedKey(group.name))
+        }
+        proxyGroupExpansionRevision &+= 1
     }
 
     func startConnectionStream() {
@@ -821,8 +859,12 @@ final class AppModel: ObservableObject {
         "\(Keys.proxyGroupExpandedPrefix).\(selectedProfileID?.uuidString ?? "none").\(groupName)"
     }
 
+    private func cacheKey(profileID: UUID?) -> String {
+        "\(Keys.cachedDataPrefix).\(profileID?.uuidString ?? "none")"
+    }
+
     private func cacheKey() -> String {
-        "\(Keys.cachedDataPrefix).\(selectedProfileID?.uuidString ?? "none")"
+        cacheKey(profileID: selectedProfileID)
     }
 
     private func proxyGroupIconsKey() -> String {
