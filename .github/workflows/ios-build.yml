@@ -1,0 +1,66 @@
+name: iOS Build
+
+on:
+  push:
+    branches: ["main"]
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build unsigned iOS app
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Archive without signing
+        run: |
+          xcodebuild archive \
+            -project Sphere.xcodeproj \
+            -scheme Sphere \
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            -archivePath build/Sphere.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      - name: Create unsigned IPA
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION_NAME="${GITHUB_REF#refs/tags/}"
+          else
+            VERSION_NAME="${SHORT_SHA}"
+          fi
+
+          IPA_NAME="sphere-${VERSION_NAME}.ipa"
+
+          mkdir -p build/Payload
+          cp -a build/Sphere.xcarchive/Products/Applications/Sphere.app build/Payload/
+          find build/Payload/Sphere.app/Frameworks -type d -name "*.framework" -exec codesign --force --sign - --preserve-metadata=identifier,entitlements {} \; || true
+          cd build
+          zip -r9 "$IPA_NAME" Payload
+
+          echo "IPA_PATH=build/${IPA_NAME}" >> "$GITHUB_ENV"
+          echo "IPA_NAME=${IPA_NAME}" >> "$GITHUB_ENV"
+
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ env.IPA_NAME }}
+          path: ${{ env.IPA_PATH }}
+          if-no-files-found: error
+
+      - name: Publish to GitHub Releases
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.IPA_PATH }}
+          generate_release_notes: true
