@@ -9,9 +9,7 @@ struct ConnectionsView: View {
         NavigationStack {
             List {
                 Section("Live") {
-                    StatRow(title: "Active", value: "\(live.connections.connections.count)")
-                    StatRow(title: "Uploaded", value: ByteFormat.bytes(live.connections.uploadTotal))
-                    StatRow(title: "Downloaded", value: ByteFormat.bytes(live.connections.downloadTotal))
+                    AdaptiveStatRows(metrics: liveMetrics)
                 }
 
                 Button {
@@ -41,6 +39,14 @@ struct ConnectionsView: View {
                     .environmentObject(live)
             }
         }
+    }
+
+    private var liveMetrics: [StatMetric] {
+        [
+            StatMetric(title: "Active", value: "\(live.connections.connections.count)"),
+            StatMetric(title: "Uploaded", value: ByteFormat.bytes(live.connections.uploadTotal)),
+            StatMetric(title: "Downloaded", value: ByteFormat.bytes(live.connections.downloadTotal))
+        ]
     }
 }
 

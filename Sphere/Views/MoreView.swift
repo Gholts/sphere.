@@ -1,17 +1,21 @@
 import SwiftUI
+import UIKit
 
 struct MoreView: View {
     @EnvironmentObject private var app: AppModel
     @EnvironmentObject private var live: LiveBackendStore
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var profileForm: ProfileFormPresentation?
 
     var body: some View {
         NavigationStack {
             List {
                 Section("Backend") {
-                    Picker("Profile", selection: profileBinding) {
-                        ForEach(app.profiles) { profile in
-                            Text(profile.name).tag(Optional(profile.id))
+                    if !usesIPadSidebar {
+                        Picker("Profile", selection: profileBinding) {
+                            ForEach(app.profiles) { profile in
+                                Text(profile.name).tag(Optional(profile.id))
+                            }
                         }
                     }
 
@@ -22,8 +26,10 @@ struct MoreView: View {
                     }
 
                     if let profile = app.selectedProfile {
-                        StatRow(title: "Type", value: profile.kind.title)
-                        StatRow(title: "URL", value: profile.baseURL)
+                        AdaptiveStatRows(metrics: [
+                            StatMetric(title: "Type", value: profile.kind.title),
+                            StatMetric(title: "URL", value: profile.baseURL)
+                        ])
 
                         Button {
                             profileForm = .edit(profile)
@@ -73,27 +79,29 @@ struct MoreView: View {
                     }
                 }
 
-                Section("Profiles") {
-                    ForEach(app.profiles) { profile in
-                        Button {
-                            profileForm = .edit(profile)
-                        } label: {
-                            HStack {
-                                VStack(alignment: .leading) {
-                                    Text(profile.name)
-                                    Text("\(profile.kind.title) · \(profile.baseURL)")
+                if !usesIPadSidebar {
+                    Section("Profiles") {
+                        ForEach(app.profiles) { profile in
+                            Button {
+                                profileForm = .edit(profile)
+                            } label: {
+                                HStack {
+                                    VStack(alignment: .leading) {
+                                        Text(profile.name)
+                                        Text("\(profile.kind.title) · \(profile.baseURL)")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
                                         .font(.caption)
-                                        .foregroundStyle(.secondary)
+                                        .foregroundStyle(.tertiary)
                                 }
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.caption)
-                                    .foregroundStyle(.tertiary)
                             }
+                            .foregroundStyle(.primary)
                         }
-                        .foregroundStyle(.primary)
+                        .onDelete(perform: app.deleteProfiles)
                     }
-                    .onDelete(perform: app.deleteProfiles)
                 }
             }
             .backendPageToolbar(tab: .more)
@@ -124,28 +132,9 @@ struct MoreView: View {
     private var canUpdateCore: Bool {
         app.selectedProfile?.kind == .mihomo && !live.overview.version.localizedCaseInsensitiveContains("sing-box")
     }
-}
 
-private enum ProfileFormPresentation: Identifiable {
-    case add
-    case edit(APIProfile)
-
-    var id: String {
-        switch self {
-        case .add:
-            return "add"
-        case .edit(let profile):
-            return profile.id.uuidString
-        }
-    }
-
-    var editingProfile: APIProfile? {
-        switch self {
-        case .add:
-            return nil
-        case .edit(let profile):
-            return profile
-        }
+    private var usesIPadSidebar: Bool {
+        UIDevice.current.userInterfaceIdiom == .pad && horizontalSizeClass == .regular
     }
 }
 
@@ -153,10 +142,12 @@ struct OverviewRows: View {
     var overview: BackendOverview
 
     var body: some View {
-        StatRow(title: "Version", value: overview.version)
-        StatRow(title: "Memory", value: ByteFormat.memoryBytes(overview.memoryBytes))
-        StatRow(title: "Upload", value: ByteFormat.speedBytes(overview.uploadBytesPerSecond))
-        StatRow(title: "Download", value: ByteFormat.speedBytes(overview.downloadBytesPerSecond))
-        StatRow(title: "Active Connections", value: overview.activeConnections.map(String.init) ?? "n/a")
+        AdaptiveStatRows(metrics: [
+            StatMetric(title: "Version", value: overview.version),
+            StatMetric(title: "Memory", value: ByteFormat.memoryBytes(overview.memoryBytes)),
+            StatMetric(title: "Upload", value: ByteFormat.speedBytes(overview.uploadBytesPerSecond)),
+            StatMetric(title: "Download", value: ByteFormat.speedBytes(overview.downloadBytesPerSecond)),
+            StatMetric(title: "Active Connections", value: overview.activeConnections.map(String.init) ?? "n/a")
+        ])
     }
 }

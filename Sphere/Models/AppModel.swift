@@ -244,10 +244,25 @@ final class AppModel: ObservableObject {
     }
 
     func deleteProfiles(at offsets: IndexSet) {
+        let previousSelectedProfileID = selectedProfileID
         profiles.remove(atOffsets: offsets)
         if !profiles.contains(where: { $0.id == selectedProfileID }) {
             selectedProfileID = profiles.first?.id
         }
+        saveProfiles()
+        if selectedProfileID != previousSelectedProfileID {
+            resetLoadedData()
+            loadCachedData()
+        }
+    }
+
+    func deleteProfile(_ profile: APIProfile) {
+        guard let index = profiles.firstIndex(where: { $0.id == profile.id }) else { return }
+        deleteProfiles(at: IndexSet(integer: index))
+    }
+
+    func moveProfiles(from offsets: IndexSet, to destination: Int) {
+        profiles.move(fromOffsets: offsets, toOffset: destination)
         saveProfiles()
     }
 
@@ -1155,7 +1170,7 @@ private struct BackendDataCache: Codable {
     var clashMode: ClashMode
 }
 
-enum AppTab: String, CaseIterable, Identifiable {
+enum AppTab: String, CaseIterable, Identifiable, Hashable {
     case proxies
     case rule
     case connections

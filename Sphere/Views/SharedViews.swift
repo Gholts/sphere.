@@ -15,6 +15,14 @@ extension AnyTransition {
     }
 }
 
+struct IPadTopNavigationControls {
+    var isPresented = false
+}
+
+extension EnvironmentValues {
+    @Entry var iPadTopNavigationControls = IPadTopNavigationControls()
+}
+
 struct EmptyStateView: View {
     var title: String
     var message: String
@@ -56,6 +64,7 @@ struct PendingErrorBadge: View {
 
 struct BackendPageToolbar: ViewModifier {
     @EnvironmentObject private var app: AppModel
+    @Environment(\.iPadTopNavigationControls) private var iPadTopNavigationControls
     var tab: AppTab
 
     func body(content: Content) -> some View {
@@ -63,20 +72,40 @@ struct BackendPageToolbar: ViewModifier {
             .navigationTitle(tab.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .principal) {
-                    NavigationTitleBadge(title: tab.title, message: app.visibleBackendErrorMessage, isLoadingError: app.showsBackendErrorSpinner)
-                }
-                ToolbarItem(id: "backend-refresh", placement: .topBarTrailing) {
-                    RefreshToolbarButton(
-                        tab: tab,
-                        isRefreshing: app.isToolbarRefreshing(tab),
-                        accessibilityLabel: tab.refreshAccessibilityLabel
-                    ) {
-                        Task { await app.refreshFromToolbar(tab) }
+                if iPadTopNavigationControls.isPresented {
+                    ToolbarItem(placement: .principal) {
+                        IPadTopTabPicker()
                     }
-                    .equatable()
+                } else {
+                    ToolbarItem(placement: .principal) {
+                        NavigationTitleBadge(title: tab.title, message: app.visibleBackendErrorMessage, isLoadingError: app.showsBackendErrorSpinner)
+                    }
+                    ToolbarItem(id: "backend-refresh", placement: .topBarTrailing) {
+                        RefreshToolbarButton(
+                            tab: tab,
+                            isRefreshing: app.isToolbarRefreshing(tab),
+                            accessibilityLabel: tab.refreshAccessibilityLabel
+                        ) {
+                            Task { await app.refreshFromToolbar(tab) }
+                        }
+                        .equatable()
+                    }
                 }
             }
+    }
+}
+
+private struct IPadTopTabPicker: View {
+    @EnvironmentObject private var app: AppModel
+
+    var body: some View {
+        Picker("Tab", selection: $app.selectedTab) {
+            ForEach(AppTab.allCases) { tab in
+                Text(tab.title).tag(tab)
+            }
+        }
+        .pickerStyle(.segmented)
+        .frame(width: 420)
     }
 }
 
@@ -162,5 +191,79 @@ struct StatRow: View {
             Text(value)
                 .multilineTextAlignment(.trailing)
         }
+    }
+}
+
+struct StatMetric: Identifiable, Equatable {
+    var id: String { title }
+    var title: String
+    var value: String
+}
+
+enum ProfileFormPresentation: Identifiable {
+    case add
+    case edit(APIProfile)
+
+    var id: String {
+        switch self {
+        case .add:
+            return "add"
+        case .edit(let profile):
+            return profile.id.uuidString
+        }
+    }
+
+    var editingProfile: APIProfile? {
+        switch self {
+        case .add:
+            return nil
+        case .edit(let profile):
+            return profile
+        }
+    }
+}
+
+struct AdaptiveStatRows: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    var metrics: [StatMetric]
+
+    private var columns: [GridItem] {
+        [
+            GridItem(.flexible(), spacing: 12),
+            GridItem(.flexible(), spacing: 12)
+        ]
+    }
+
+    var body: some View {
+        if horizontalSizeClass == .regular {
+            LazyVGrid(columns: columns, alignment: .leading, spacing: 12) {
+                ForEach(metrics) { metric in
+                    StatTile(metric: metric)
+                }
+            }
+            .padding(.vertical, 2)
+        } else {
+            ForEach(metrics) { metric in
+                StatRow(title: metric.title, value: metric.value)
+            }
+        }
+    }
+}
+
+private struct StatTile: View {
+    var metric: StatMetric
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(metric.title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(metric.value)
+                .font(.body)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 }

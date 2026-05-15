@@ -3,10 +3,16 @@ import UIKit
 
 struct ProxiesView: View {
     @EnvironmentObject private var app: AppModel
-    private let proxyColumns = [
-        GridItem(.flexible(), spacing: 8),
-        GridItem(.flexible(), spacing: 8)
-    ]
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    private var proxyColumns: [GridItem] {
+        [
+            GridItem(
+                .adaptive(minimum: horizontalSizeClass == .regular ? 180 : 150, maximum: 280),
+                spacing: 8
+            )
+        ]
+    }
 
     var body: some View {
         NavigationStack {
