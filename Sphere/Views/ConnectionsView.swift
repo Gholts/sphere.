@@ -132,7 +132,8 @@ struct ConnectionRow: View {
             HStack {
                 Text(connection.metadata.sourceIP ?? "source n/a")
                 Spacer()
-                Text(connection.outbound.isEmpty ? "outbound n/a" : connection.outbound)
+                Text(verbatim: connection.outbound.isEmpty ? "outbound n/a" : connection.outbound.backendNameForDisplay)
+                    .lineLimit(1)
             }
             .font(.caption)
             .foregroundStyle(.secondary)

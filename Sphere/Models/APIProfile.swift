@@ -19,7 +19,26 @@ enum BackendKind: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 
     var isImplemented: Bool {
+        self == .mihomo || self == .singbox
+    }
+
+    var showsProxyProviders: Bool {
         self == .mihomo
+    }
+
+    static func detected(fromVersion version: String) -> BackendKind? {
+        let lowercased = version.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !lowercased.isEmpty else { return nil }
+        if lowercased.contains("sing-box") || lowercased.contains("singbox") {
+            return .singbox
+        }
+        if lowercased.contains("mihomo") || lowercased.contains("meta") || lowercased.contains("clash") {
+            return .mihomo
+        }
+        if lowercased.contains("surge") {
+            return .surge
+        }
+        return nil
     }
 }
 

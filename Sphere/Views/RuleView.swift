@@ -85,7 +85,7 @@ private struct RuleRow: View {
     @ViewBuilder
     private var metadataRow: some View {
         if rule.isMatch {
-            Text(rule.proxy)
+            Text(verbatim: rule.proxy.backendNameForDisplay)
                 .font(.caption)
                 .foregroundStyle(.secondary)
         } else {
@@ -98,7 +98,7 @@ private struct RuleRow: View {
                     Text("\(count) rules")
                 }
                 Spacer()
-                Text(rule.proxy)
+                Text(verbatim: rule.proxy.backendNameForDisplay)
             }
             .font(.caption)
             .foregroundStyle(.secondary)

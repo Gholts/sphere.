@@ -21,19 +21,21 @@ struct ProxiesView: View {
                     EmptyStateView(title: "No Proxy Groups", message: "Refresh after backend connects.", systemImage: "point.3.connected.trianglepath.dotted")
                         .listRowBackground(Color.clear)
                 } else {
-                    Section("Providers") {
-                        if app.proxyProviders.isEmpty {
-                            Text("No providers")
-                                .foregroundStyle(.secondary)
-                        } else {
-                            ForEach(app.proxyProviders) { provider in
-                                ProxyProviderRow(provider: provider) {
-                                    Task { await app.refreshProxyProvider(provider.name) }
+                    if app.selectedProfile?.kind.showsProxyProviders == true {
+                        Section("Providers") {
+                            if app.proxyProviders.isEmpty {
+                                Text("No providers")
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                ForEach(app.proxyProviders) { provider in
+                                    ProxyProviderRow(provider: provider) {
+                                        Task { await app.refreshProxyProvider(provider.name) }
+                                    }
                                 }
                             }
                         }
                     }
-                    
+
                     Section {
                         ForEach(app.proxyCollection.groups) { group in
                             ProxyGroupSection(group: group, proxyColumns: proxyColumns)
@@ -163,7 +165,7 @@ struct ProxyGroupSection: View {
                 HStack(spacing: 8) {
                     ProxyIconView(icon: group.icon, size: 18)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(group.name)
+                        Text(verbatim: group.displayName)
                             .font(.headline)
                         Text("\(group.type) · \(group.all.count) nodes")
                             .font(.caption)
@@ -197,7 +199,7 @@ struct ProxyProviderRow: View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 HStack() {
-                    Text(provider.name)
+                    Text(verbatim: provider.name.backendNameForDisplay)
                     Text(provider.vehicleType ?? provider.type ?? "Provider")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -230,7 +232,7 @@ struct ProxyChoiceButton: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 4) {
                     ProxyIconView(icon: proxy?.icon, size: 16)
-                    Text(proxy?.name ?? name)
+                    Text(verbatim: proxy?.displayName ?? name.backendNameForDisplay)
                         .font(.subheadline)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
@@ -256,7 +258,7 @@ struct ProxyChoiceButton: View {
             .background(isSelected ? Color.accentColor.opacity(0.12) : Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 16))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(proxy?.name ?? name)\(isSelected ? ", selected" : "")")
+        .accessibilityLabel("\(proxy?.displayName ?? name.backendNameForDisplay)\(isSelected ? ", selected" : "")")
     }
 }
 
@@ -291,7 +293,7 @@ struct ProxyMetaLine: View {
     var proxy: ProxyItem
 
     var body: some View {
-        Text(proxy.metaBadges.joined(separator: " · "))
+        Text(verbatim: proxy.metaBadges.map(\.backendNameForDisplay).joined(separator: " · "))
             .font(.caption2)
             .foregroundStyle(.secondary)
             .lineLimit(2)

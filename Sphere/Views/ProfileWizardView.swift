@@ -116,9 +116,12 @@ struct ProfileWizardView: View {
         let startedAt = Date()
         isTesting = true
         let nextResult: ProfileTestResult
+        let testedProfile = profile
         do {
-            let overview = try await app.testProfile(profile)
-            nextResult = .success(CoreVersionDisplay.successMessage(for: overview.version, kind: kind))
+            let overview = try await app.testProfile(testedProfile)
+            let detectedKind = CoreVersionDisplay.resolvedKind(for: overview.version, fallback: testedProfile.kind)
+            kind = detectedKind
+            nextResult = .success(CoreVersionDisplay.successMessage(for: overview.version, kind: detectedKind))
         } catch {
             nextResult = .failure(error.localizedDescription)
         }
@@ -186,6 +189,13 @@ enum CoreVersionDisplay {
 
     static func successMessage(for version: String, kind: BackendKind) -> String {
         "OK: \(coreAndVersion(for: version, kind: kind))"
+    }
+
+    static func resolvedKind(for version: String, fallback: BackendKind) -> BackendKind {
+        guard let detected = BackendKind.detected(fromVersion: version), detected.isImplemented else {
+            return fallback
+        }
+        return detected
     }
 
     static func coreAndVersion(for version: String, kind: BackendKind) -> String {

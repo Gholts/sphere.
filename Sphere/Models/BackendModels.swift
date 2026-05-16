@@ -378,8 +378,11 @@ struct ProviderCollection<T: Decodable & Identifiable & Equatable>: Decodable, E
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        let values = try container.nestedContainer(keyedBy: DynamicCodingKey.self, forKey: .providers)
-        providers = try values.allKeys.map { try values.decode(T.self, forKey: $0) }
+        if let values = try? container.nestedContainer(keyedBy: DynamicCodingKey.self, forKey: .providers) {
+            providers = try values.allKeys.map { try values.decode(T.self, forKey: $0) }
+        } else {
+            providers = try container.decodeIfPresent([T].self, forKey: .providers) ?? []
+        }
     }
 }
 
@@ -506,6 +509,13 @@ struct RuleItem: Identifiable, Codable, Equatable, Sendable {
     var proxy: String
     var index: Int?
 
+    enum CodingKeys: String, CodingKey {
+        case type
+        case payload
+        case proxy
+        case index
+    }
+
     var isRuleSet: Bool {
         ["ruleset", "rule-set", "rule_set"].contains(normalizedType)
     }
@@ -529,8 +539,24 @@ struct RuleItem: Identifiable, Codable, Equatable, Sendable {
     init(type: String, payload: String, proxy: String, index: Int? = nil) {
         self.type = type
         self.payload = payload
-        self.proxy = proxy
+        self.proxy = Self.cleanProxyName(proxy)
         self.index = index
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        type = try container.decodeIfPresent(String.self, forKey: .type) ?? ""
+        payload = try container.decodeIfPresent(String.self, forKey: .payload) ?? ""
+        proxy = Self.cleanProxyName(try container.decodeIfPresent(String.self, forKey: .proxy) ?? "")
+        index = try container.decodeIfPresent(Int.self, forKey: .index)
+    }
+
+    private static func cleanProxyName(_ value: String) -> String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.hasPrefix("route("), trimmed.hasSuffix(")") else {
+            return value
+        }
+        return String(trimmed.dropFirst(6).dropLast())
     }
 }
 
@@ -631,6 +657,14 @@ struct ConnectionsSnapshot: Codable, Equatable, Sendable {
     var uploadTotal: Int64?
     var downloadTotal: Int64?
     var connections: [ConnectionInfo]
+    var memory: Int?
+
+    init(uploadTotal: Int64?, downloadTotal: Int64?, connections: [ConnectionInfo], memory: Int? = nil) {
+        self.uploadTotal = uploadTotal
+        self.downloadTotal = downloadTotal
+        self.connections = connections
+        self.memory = memory
+    }
 }
 
 struct ConnectionFilter: Equatable, Sendable {

@@ -35,7 +35,9 @@ enum BackendClientFactory {
         switch profile.kind {
         case .mihomo:
             return MihomoClient(profile: profile)
-        case .singbox, .surge:
+        case .singbox:
+            return SingboxClient(profile: profile)
+        case .surge:
             return UnsupportedBackendClient(profile: profile)
         }
     }
