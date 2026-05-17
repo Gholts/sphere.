@@ -5,24 +5,23 @@ struct ConfigEditorView: View {
     @State private var draft: [String: String] = [:]
     @State private var isLoadingConfig = false
 
-    private var scalarKeys: [String] {
-        app.configs.keys
-            .filter { app.configs[$0]?.isScalar == true }
-            .sorted()
+    private var configSections: [BackendConfigSection] {
+        BackendConfigCatalog.sections(for: app.selectedProfile?.kind, configs: app.configs)
     }
 
-    private var nestedKeys: [String] {
-        app.configs.keys
-            .filter { app.configs[$0]?.isScalar == false }
-            .sorted()
+    private var editableFields: [BackendConfigField] {
+        configSections.flatMap(\.fields)
     }
 
     private var changedValues: [String: JSONValue] {
-        scalarKeys.reduce(into: [:]) { result, key in
-            guard let original = app.configs[key], let text = draft[key] else { return }
-            let parsed = JSONScalarParser.parse(text, fallback: original)
+        editableFields.reduce(into: [:]) { result, field in
+            guard
+                let original = app.configs.value(at: field.path),
+                let text = draft[field.id]
+            else { return }
+            let parsed = field.control.parsedValue(from: text, fallback: original)
             if parsed != original {
-                result[key] = parsed
+                result.mergeConfigPatch(path: field.path, value: parsed, originals: app.configs)
             }
         }
     }
@@ -36,32 +35,26 @@ struct ConfigEditorView: View {
             } else if app.configs.isEmpty {
                 EmptyStateView(title: "No Config", message: "Refresh config or check backend connection.", systemImage: "slider.horizontal.3")
                     .listRowBackground(Color.clear)
-            } else if scalarKeys.isEmpty {
-                EmptyStateView(title: "No Scalar Config", message: "Backend returned only nested fields.", systemImage: "slider.horizontal.3")
+            } else if configSections.isEmpty {
+                EmptyStateView(title: "No Editable Config", message: "Backend returned no supported `/configs` keys.", systemImage: "slider.horizontal.3")
                     .listRowBackground(Color.clear)
             } else {
-                Section("Editable") {
-                    ForEach(scalarKeys, id: \.self) { key in
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(key)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            TextField(key, text: binding(for: key))
-                                .textInputAutocapitalization(.never)
+                ForEach(configSections) { section in
+                    Section(section.title) {
+                        ForEach(section.fields) { field in
+                            if let value = app.configs.value(at: field.path) {
+                                ConfigFieldRow(
+                                    field: field,
+                                    value: value,
+                                    text: binding(for: field, value: value)
+                                )
+                            }
                         }
                     }
                 }
             }
-
-            if !nestedKeys.isEmpty {
-                Section("Nested") {
-                    ForEach(nestedKeys, id: \.self) { key in
-                        StatRow(title: key, value: app.configs[key]?.displayText ?? "")
-                    }
-                }
-            }
         }
-        .navigationTitle("Configuration")
+        .navigationTitle("Advanced Config")
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 Button {
@@ -89,10 +82,10 @@ struct ConfigEditorView: View {
         }
     }
 
-    private func binding(for key: String) -> Binding<String> {
+    private func binding(for field: BackendConfigField, value: JSONValue) -> Binding<String> {
         Binding(
-            get: { draft[key] ?? app.configs[key]?.displayText ?? "" },
-            set: { draft[key] = $0 }
+            get: { draft[field.id] ?? field.control.displayText(for: value) },
+            set: { draft[field.id] = $0 }
         )
     }
 
@@ -104,8 +97,9 @@ struct ConfigEditorView: View {
     }
 
     private func save() async {
-        await app.patchConfig(changedValues)
-        pruneDraft()
+        if await app.patchConfig(changedValues) {
+            pruneDraft()
+        }
     }
 
     private func reload() async {
@@ -116,7 +110,116 @@ struct ConfigEditorView: View {
     }
 
     private func pruneDraft() {
-        let validKeys = Set(scalarKeys)
+        let validKeys = Set(editableFields.map(\.id))
         draft = draft.filter { key, _ in validKeys.contains(key) }
+    }
+}
+
+private struct ConfigFieldRow: View {
+    var field: BackendConfigField
+    var value: JSONValue
+    @Binding var text: String
+
+    var body: some View {
+        switch field.control {
+        case .toggle:
+            Toggle(isOn: boolBinding) {
+                ConfigFieldLabel(title: field.title)
+            }
+        case .picker:
+            Picker(selection: $text) {
+                ForEach(field.control.pickerOptions(containing: text), id: \.self) { option in
+                    Text(option.isEmpty ? "Default" : option).tag(option)
+                }
+            } label: {
+                ConfigFieldLabel(title: field.title)
+            }
+        case .number:
+            HStack {
+                ConfigFieldLabel(title: field.title)
+                TextField(value.displayText, text: $text)
+                    .keyboardType(.numbersAndPunctuation)
+                    .textInputAutocapitalization(.never)
+                    .multilineTextAlignment(.trailing)
+            }
+        case .text:
+            HStack {
+                ConfigFieldLabel(title: field.title)
+                TextField(value.displayText, text: $text)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .multilineTextAlignment(.trailing)
+            }
+        case .longText:
+            NavigationLink {
+                ConfigTextDetailEditor(title: field.title, text: $text, isMonospaced: true)
+            } label: {
+                detailLabel(summary: text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Empty" : "Set")
+            }
+        case .stringList, .numberList:
+            NavigationLink {
+                ConfigTextDetailEditor(title: field.title, text: $text, isMonospaced: true)
+            } label: {
+                detailLabel(summary: listSummary)
+            }
+        case .json:
+            NavigationLink {
+                ConfigTextDetailEditor(title: field.title, text: $text, isMonospaced: true)
+            } label: {
+                detailLabel(summary: value.displayText)
+            }
+        }
+    }
+
+    private func detailLabel(summary: String) -> some View {
+        HStack {
+            ConfigFieldLabel(title: field.title)
+            Spacer()
+            Text(summary)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+    }
+
+    private var boolBinding: Binding<Bool> {
+        Binding(
+            get: { ["true", "1", "yes", "on"].contains(text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()) },
+            set: { text = $0 ? "true" : "false" }
+        )
+    }
+
+    private var listSummary: String {
+        let count = text
+            .components(separatedBy: CharacterSet(charactersIn: ",\n"))
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .count
+        return count == 0 ? "Empty" : "\(count) items"
+    }
+}
+
+private struct ConfigTextDetailEditor: View {
+    var title: String
+    @Binding var text: String
+    var isMonospaced: Bool
+
+    var body: some View {
+        TextEditor(text: $text)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+            .font(isMonospaced ? .body.monospaced() : .body)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+private struct ConfigFieldLabel: View {
+    var title: String
+
+    var body: some View {
+        Text(title)
+            .foregroundStyle(.primary)
     }
 }

@@ -473,13 +473,14 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func patchConfig(_ changedValues: [String: JSONValue]) async {
-        guard let client else { return }
-        _ = await captureErrors {
+    func patchConfig(_ changedValues: [String: JSONValue]) async -> Bool {
+        guard let client else { return false }
+        let outcome = await captureErrors {
             try await client.patchConfigs(changedValues)
             applyConfigs(try await client.configs())
             saveCachedDataIfUseful()
         }
+        return outcome.errorMessage == nil
     }
 
     func reloadConfig() async {
