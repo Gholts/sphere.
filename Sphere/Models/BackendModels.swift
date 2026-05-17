@@ -707,6 +707,52 @@ enum CoreUpdateChannel: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
+struct CoreUpdateReport: Equatable, Sendable {
+    enum Status: Equatable, Sendable {
+        case success
+        case failure
+        case skipped
+    }
+
+    var channel: CoreUpdateChannel
+    var status: Status
+    var message: String
+
+    var title: String {
+        switch status {
+        case .success:
+            return "Update Finished"
+        case .failure:
+            return "Update Failed"
+        case .skipped:
+            return "Update Unavailable"
+        }
+    }
+
+    var systemImage: String {
+        switch status {
+        case .success:
+            return "checkmark.circle.fill"
+        case .failure:
+            return "xmark.circle.fill"
+        case .skipped:
+            return "exclamationmark.triangle.fill"
+        }
+    }
+
+    static func success(channel: CoreUpdateChannel) -> CoreUpdateReport {
+        CoreUpdateReport(channel: channel, status: .success, message: "\(channel.title) core update finished.")
+    }
+
+    static func failure(channel: CoreUpdateChannel, message: String) -> CoreUpdateReport {
+        CoreUpdateReport(channel: channel, status: .failure, message: "\(channel.title) core update failed. \(message)")
+    }
+
+    static func skipped(channel: CoreUpdateChannel) -> CoreUpdateReport {
+        CoreUpdateReport(channel: channel, status: .skipped, message: "Core update unavailable for current backend.")
+    }
+}
+
 struct DynamicCodingKey: CodingKey {
     var stringValue: String
     var intValue: Int?

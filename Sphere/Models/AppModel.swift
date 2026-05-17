@@ -529,14 +529,24 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func upgradeCore(channel: CoreUpdateChannel) async {
-        guard let client, canUpdateCore else { return }
+    func upgradeCore(channel: CoreUpdateChannel) async -> CoreUpdateReport {
+        guard let client, canUpdateCore else {
+            return .skipped(channel: channel)
+        }
         isUpdatingCore = true
         defer { isUpdatingCore = false }
-        _ = await captureErrors {
+        do {
             try await client.upgradeCore(channel: channel)
+            markBackendConnected()
+            await refreshAll()
+            return .success(channel: channel)
+        } catch {
+            guard !error.isCancellation else {
+                return .failure(channel: channel, message: "Cancelled.")
+            }
+            beginBackendErrorDebounce(error.localizedDescription)
+            return .failure(channel: channel, message: error.localizedDescription)
         }
-        await refreshAll()
     }
 
     func startLiveStreams() {

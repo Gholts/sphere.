@@ -87,7 +87,7 @@ enum ProxyLatencyTestDefaults {
     nonisolated static let maxConcurrentGroups = 3
 }
 
-enum BackendError: LocalizedError, Equatable {
+enum BackendError: LocalizedError, Equatable, Sendable {
     case invalidBaseURL
     case invalidResponse
     case httpStatus(Int, String)
@@ -100,10 +100,46 @@ enum BackendError: LocalizedError, Equatable {
         case .invalidResponse:
             return "Bad backend response"
         case .httpStatus(let status, let body):
-            return "HTTP \(status): \(body)"
+            return "HTTP \(status): \(HTTPErrorBodyDisplay.message(from: body))"
         case .unsupportedBackend(let backend):
             return "\(backend) backend not implemented"
         }
+    }
+}
+
+private enum HTTPErrorBodyDisplay {
+    private static let preferredKeys = ["message", "error", "detail", "reason", "description"]
+
+    static func message(from body: String) -> String {
+        let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard
+            let data = trimmed.data(using: .utf8),
+            let object = try? JSONSerialization.jsonObject(with: data)
+        else {
+            return trimmed
+        }
+
+        return message(fromJSONObject: object) ?? trimmed
+    }
+
+    private static func message(fromJSONObject object: Any) -> String? {
+        if let text = object as? String {
+            return text
+        }
+        if let number = object as? NSNumber {
+            return number.stringValue
+        }
+        if let dictionary = object as? [String: Any] {
+            for key in preferredKeys {
+                if let value = dictionary[key], let message = message(fromJSONObject: value) {
+                    return message
+                }
+            }
+            if dictionary.count == 1, let value = dictionary.values.first {
+                return message(fromJSONObject: value)
+            }
+        }
+        return nil
     }
 }
 
